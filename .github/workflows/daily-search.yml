@@ -1,0 +1,40 @@
+name: Edicola Hunter - ricerca quotidiana
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 15:17 UTC = 16:17 in Italia in inverno, 17:17 in estate
+    - cron: "17 15 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: edicola-hunter-daily
+  cancel-in-progress: false
+
+jobs:
+  search:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Scarica il repository
+        uses: actions/checkout@v4
+      - name: Configura Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Cerca nuove opportunità e invia notifiche
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: node scripts/daily-search.mjs
+      - name: Salva lo storico aggiornato
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/leads.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Aggiorna archivio opportunità"
+            git push
+          fi
